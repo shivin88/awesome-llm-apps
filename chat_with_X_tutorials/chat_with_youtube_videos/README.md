@@ -1,31 +1,89 @@
-## 📽️ Chat with YouTube Videos 
+🎥 YouTube Video Chatbot with AI
 
-LLM app with RAG to chat with YouTube Videos with OpenAI's gpt-4o, mem0/embedchain as memory and the youtube-transcript-api. The app uses Retrieval Augmented Generation (RAG) to provide accurate answers to questions based on the content of the uploaded video.
+This project allows users to interact with YouTube videos by asking questions about their content. The chatbot extracts video transcripts, retrieves relevant sections using embeddings, and generates responses using Google's Gemini AI.
 
-### Features
+🚀 Features
 
-- Input a YouTube video URL
-- Ask questions about the content of the video
-- Get accurate answers using RAG and the selected LLM
+Extracts and processes YouTube video transcripts
 
-### How to get Started?
+Uses Sentence Transformers for embedding-based search
 
-1. Clone the GitHub repository
+Integrates with Google Gemini AI for generating responses
 
-```bash
-git clone https://github.com/Shubhamsaboo/awesome-llm-apps.git
-cd awesome-llm-apps/chat_with_X_tutorials/chat_with_youtube_videos
-```
-2. Install the required dependencies:
+Built with Streamlit for an interactive UI
 
-```bash
+🛠️ Installation & Setup
+
+1️⃣ Clone the Repository
+
+git clone https://github.com/your-username/your-repo.git
+cd your-repo
+
+2️⃣ Create a Virtual Environment (Optional but Recommended)
+
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+
+3️⃣ Install Dependencies
+
 pip install -r requirements.txt
-```
-3. Get your OpenAI API Key
 
-- Sign up for an [OpenAI account](https://platform.openai.com/) (or the LLM provider of your choice) and obtain your API key.
+4️⃣ Set Up API Key Securely
 
-4. Run the Streamlit App
-```bash
-streamlit run chat_youtube.py
-```
+Do NOT hardcode the API key in the script. Instead, create a .env file:
+
+touch .env
+
+Add this to .env:
+
+GEMINI_API_KEY=your_actual_api_key
+
+Then, load it in Python using dotenv:
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+5️⃣ Run the Application
+
+streamlit run app.py
+
+🔑 Environment Variables
+
+Ensure you have the following variables set:
+
+GEMINI_API_KEY: Your Google Gemini API Key
+
+📜 Usage
+
+Enter a YouTube video URL.
+
+The app fetches and processes the transcript.
+
+Ask questions related to the video's content.
+
+Get AI-powered responses based on the transcript.
+
+📌 Technologies Used
+
+Python
+
+Streamlit (Web UI)
+
+YouTube Transcript API (Extracts transcripts)
+
+Sentence Transformers (Embedding-based search)
+
+Google Gemini AI (LLM for generating responses)
+
+⚠️ Important Security Notice
+
+Never expose your API key in public repositories.
+
+Add .env to .gitignore to prevent it from being uploaded.
+
+📝 License
+
+This project is open-source and available under the MIT License.
