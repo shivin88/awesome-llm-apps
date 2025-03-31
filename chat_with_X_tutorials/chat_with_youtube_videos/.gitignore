@@ -1,2 +1,16 @@
-.env # Prevents accidental commits
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
 .env
+.venv
+
+# System
+.DS_Store
+Thumbs.db
+
+# Downloads
+/downloads/
+*.mp4
+*.tmp
