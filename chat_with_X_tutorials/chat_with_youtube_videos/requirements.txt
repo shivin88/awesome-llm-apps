@@ -4,3 +4,6 @@ youtube-transcript-api==0.6.3
 numpy
 sentence-transformers
 google-generativeai
+opencv-python
+pytube
+yt-dlp
