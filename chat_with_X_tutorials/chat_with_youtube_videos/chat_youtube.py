@@ -1,4 +1,8 @@
 import streamlit as st
+from dotenv import load_dotenv  # Add this import at the top
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Must be the first Streamlit command
 st.set_page_config(
