@@ -7,3 +7,4 @@ google-generativeai
 opencv-python
 pytube
 yt-dlp
+python-dotenv>=1.0.0
