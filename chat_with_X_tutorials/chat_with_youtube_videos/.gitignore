@@ -5,10 +5,12 @@ __pycache__/
 # Environment
 .env
 .venv
+myenv/
 
 # System
 .DS_Store
 Thumbs.db
+tempCodeRunnerFile.py
 
 # Downloads
 /downloads/

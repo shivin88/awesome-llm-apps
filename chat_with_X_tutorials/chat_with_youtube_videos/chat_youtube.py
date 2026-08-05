@@ -13,6 +13,9 @@ import asyncio
 import sys
 import re
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import numpy as np
 from typing import List, Tuple
 import yt_dlp
@@ -118,7 +121,38 @@ def download_video(video_url: str) -> str:
     except Exception as e:
         raise RuntimeError(f"❌ Error downloading video: {e}")
 
-# 📝 Fetch YouTube Video Transcript
+import json
+import urllib.request
+
+def fetch_transcript_ytdlp(video_url: str) -> str:
+    try:
+        ydl_opts = {'skip_download': True, 'quiet': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            captions = info.get('automatic_captions') or info.get('subtitles')
+            if not captions:
+                return None
+            sub_info = captions.get('en') or captions.get('en-orig') or list(captions.values())[0]
+            json_url = None
+            for fmt in sub_info:
+                if fmt.get('ext') == 'json3':
+                    json_url = fmt.get('url')
+                    break
+            if json_url:
+                req = urllib.request.urlopen(json_url)
+                data = json.loads(req.read().decode('utf-8'))
+                lines = []
+                for event in data.get('events', []):
+                    for seg in event.get('segs', []):
+                        text = seg.get('utf8', '').strip()
+                        if text and text != '\n':
+                            lines.append(text)
+                if lines:
+                    return ' '.join(lines)
+    except Exception as e:
+        print(f"[DEBUG] yt_dlp transcript fallback error: {e}")
+    return None
+
 def fetch_video_transcript(video_url: str) -> str:
     video_id = extract_video_id(video_url)
     if not video_id:
@@ -126,12 +160,18 @@ def fetch_video_transcript(video_url: str) -> str:
 
     try:
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
-    except NoTranscriptFound:
-        return "No transcript available."
-    except TranscriptsDisabled:
-        return "Subtitles are disabled for this video."
-    
-    return " ".join(entry["text"] for entry in transcript)
+        text = " ".join(entry["text"] for entry in transcript)
+        if text.strip():
+            return text
+    except Exception as e:
+        print(f"[INFO] YouTubeTranscriptApi failed ({e}), falling back to yt_dlp...")
+
+    ytdlp_text = fetch_transcript_ytdlp(video_url)
+    if ytdlp_text and ytdlp_text.strip():
+        return ytdlp_text
+
+    return "No transcript or subtitles available for this video."
+
 
 # 🖼️ Extract Key Frames from Video
 def extract_key_frames(video_path: str, num_frames: int = 3) -> List[Image.Image]:
@@ -155,7 +195,7 @@ def extract_key_frames(video_path: str, num_frames: int = 3) -> List[Image.Image
     return frames
 
 # 📝 Split Transcript into Chunks
-def split_transcript_into_chunks(transcript: str, chunk_size: int = 1000) -> List[str]:
+def split_transcript_into_chunks(transcript: str, chunk_size: int = 500) -> List[str]:
     words = transcript.split()
     return [' '.join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)] if words else []
 
@@ -166,39 +206,49 @@ def initialize_embedding_model():
 
 def retrieve_relevant_chunks(query: str, chunks: List[str], embedding_model, top_k: int = 5) -> List[str]:
     if not chunks:
-        return ["No relevant information found."]
+        return []
     
     query_embedding = embedding_model.encode(query, convert_to_tensor=True)
     chunk_embeddings = embedding_model.encode(chunks, convert_to_tensor=True)
     similarities = util.cos_sim(query_embedding, chunk_embeddings)[0].cpu().numpy()
     
     top_indices = np.argsort(similarities)[-top_k:][::-1]
-    return [chunks[i] for i in top_indices if similarities[i] > 0.2]
+    filtered = [chunks[i] for i in top_indices if similarities[i] > 0.15]
+    if filtered:
+        return filtered
+    return [chunks[i] for i in top_indices[:min(top_k, len(chunks))]]
 
 # 🤖 Generate AI Response
 def generate_response(query: str, relevant_chunks: List[str], llm, images: List[Image.Image] = None) -> str:
-    try:
-        transcript_text = "\n".join(relevant_chunks) if relevant_chunks else "No relevant information found."
-        
-        prompt = f"""
-        You are an AI assistant answering questions about a YouTube video. Use the transcript below to generate a response.
-        
-        *Transcript Snippets:*  
-        {transcript_text}
-        
-        *User Question:* {query}
-        
-        *Final Answer:*  
-        """
+    transcript_text = "\n".join(relevant_chunks) if relevant_chunks else "No relevant information found."
+    
+    prompt = f"""
+    You are an AI assistant answering questions about a YouTube video. Use the transcript below to generate a response.
+    
+    *Transcript Snippets:*  
+    {transcript_text}
+    
+    *User Question:* {query}
+    
+    *Final Answer:*  
+    """
 
-        if images:
-            response = llm.generate_content([prompt] + images)
-        else:
-            response = llm.generate_content(prompt)
+    candidate_models = ["gemini-flash-latest"]
+    last_error = None
 
-        return response.text if response else "No response generated."
-    except Exception as e:
-        return f"Error during generation: {e}"
+    for model_name in candidate_models:
+        try:
+            model = genai.GenerativeModel(model_name)
+            if images:
+                response = model.generate_content([prompt] + images)
+            else:
+                response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            last_error = e
+
+    return f"Error during generation: {last_error}"
 
 # 🚀 Streamlit UI
 def main():
@@ -238,7 +288,7 @@ def main():
     if "processed_queries" not in st.session_state:
         st.session_state.processed_queries = set()
 
-    llm = genai.GenerativeModel("gemini-1.5-flash")
+    llm = genai.GenerativeModel("gemini-flash-latest")
     embedding_model = initialize_embedding_model()
 
     # Video URL input
@@ -249,7 +299,7 @@ def main():
     if video_url:
         with st.spinner("🔍 Processing video..."):
             transcript = fetch_video_transcript(video_url)
-            if "No transcript" in transcript or "Subtitles are disabled" in transcript:
+            if transcript.startswith("No transcript") or transcript.startswith("Subtitles are disabled") or transcript.startswith("Invalid") or transcript.startswith("ERROR:") or "could not be parsed" in transcript:
                 st.error(transcript)
             else:
                 st.success("✅ Video transcript loaded successfully!")
